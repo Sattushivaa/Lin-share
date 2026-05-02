@@ -10,6 +10,7 @@ const APP_ID = 'com.example.LanDrop';
 const PORT = 8977;
 const SAVE_DIR = GLib.build_filenamev([GLib.get_home_dir(), 'LanDropUploads']);
 const APP_DIR = GLib.get_current_dir();
+const TOKEN_BYTES = 18;
 
 function ensureDir(path) {
     try {
@@ -26,13 +27,21 @@ function getLanIP() {
     }
 }
 
+function generateAccessToken() {
+    const bytes = GLib.random_bytes_new(TOKEN_BYTES).unref_to_array();
+    return bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 class LanDropWindow extends Gtk.ApplicationWindow {
     constructor(app) {
         super({ application: app, title: 'LanDrop', default_width: 760, default_height: 500 });
 
         ensureDir(SAVE_DIR);
         this.server = null;
-        this.baseUrl = `http://${getLanIP()}:${PORT}`;
+        this.baseServerUrl = `http://${getLanIP()}:${PORT}`;
+        this.accessToken = generateAccessToken();
+        this.baseUrl = `${this.baseServerUrl}/?token=${this.accessToken}`;
+        this.devices = new Map();
 
         const builder = Gtk.Builder.new_from_file('./ui.ble');
         const root = builder.get_object('root_box');
@@ -43,10 +52,19 @@ class LanDropWindow extends Gtk.ApplicationWindow {
         this.urlEntry.set_text(this.baseUrl);
         this.logBuffer = builder.get_object('log_buffer');
         this.qrPicture = builder.get_object('qr_picture');
+        this.devicesCombo = builder.get_object('devices_combo');
+        this.pairingSwitch = builder.get_object('pairing_switch');
 
         builder.get_object('start_btn').connect('clicked', () => this.startServer());
         builder.get_object('stop_btn').connect('clicked', () => this.stopServer());
         builder.get_object('copy_btn').connect('clicked', () => this.copyUrl());
+        builder.get_object('rotate_token_btn').connect('clicked', () => this.rotateToken());
+        builder.get_object('revoke_device_btn').connect('clicked', () => this.revokeSelectedDevice());
+        builder.get_object('revoke_all_btn').connect('clicked', () => this.revokeAllDevices());
+        this.pairingSwitch.connect('state-set', (_sw, state) => {
+            this.appendLog(state ? 'Pairing enabled' : 'Pairing disabled');
+            return false;
+        });
 
         this.renderQr();
     }
@@ -88,6 +106,131 @@ class LanDropWindow extends Gtk.ApplicationWindow {
 
     html() {
         return this.readAsset('frontend.html') || this.readAsset('index.html') || '<h1>Frontend missing</h1>';
+    }
+
+    parseQuery(rawQuery = '') {
+        const values = {};
+        for (const pair of rawQuery.split('&')) {
+            if (!pair) continue;
+            const [k, v] = pair.split('=', 2);
+            values[decodeURIComponent(k || '')] = decodeURIComponent(v || '');
+        }
+        return values;
+    }
+
+    isAuthorized(msg) {
+        const query = this.parseQuery(msg.get_uri().get_query() || '');
+        const pairToken = query.token || '';
+        const deviceToken = msg.get_request_headers().get_one('X-LanDrop-Token') || '';
+        if (pairToken && pairToken === this.accessToken) return true;
+        for (const d of this.devices.values()) {
+            if (d.token === deviceToken && !d.revoked) return true;
+        }
+        return false;
+    }
+
+    requireAuthorized(msg) {
+        if (this.isAuthorized(msg)) return true;
+        msg.set_status(403, null);
+        msg.get_response_headers().set_content_type('text/plain', { charset: 'utf-8' });
+        msg.get_response_body().append(new TextEncoder().encode('Forbidden: invalid or revoked token\n'));
+        return false;
+    }
+
+    rotateToken() {
+        this.accessToken = generateAccessToken();
+        this.baseUrl = `${this.baseServerUrl}/?token=${this.accessToken}`;
+        this.urlEntry.set_text(this.baseUrl);
+        this.statusLabel.set_label(`Running on ${this.baseUrl}`);
+        this.appendLog('Access revoked: token rotated');
+        this.renderQr();
+    }
+
+    refreshDevicesUi() {
+        this.devicesCombo.remove_all();
+        let activeCount = 0;
+        for (const [deviceId, d] of this.devices.entries()) {
+            if (d.revoked) continue;
+            activeCount++;
+            this.devicesCombo.append(deviceId, `${d.label}`);
+        }
+        this.devicesCombo.set_active(activeCount > 0 ? 0 : -1);
+    }
+
+    registerDevice(msg) {
+        if (!this.pairingSwitch.get_active()) {
+            msg.set_status(403, null);
+            msg.get_response_headers().set_content_type('text/plain', { charset: 'utf-8' });
+            msg.get_response_body().append(new TextEncoder().encode('Pairing disabled by server\n'));
+            return;
+        }
+        const body = msg.get_request_body().flatten().get_data();
+        const input = JSON.parse(new TextDecoder().decode(body) || '{}');
+        if (!input.deviceId) {
+            msg.set_status(400, null);
+            return;
+        }
+        const existing = this.devices.get(input.deviceId);
+        const token = existing?.token || generateAccessToken();
+        const label = input.deviceName || input.deviceId;
+        this.devices.set(input.deviceId, { token, label, revoked: false, lastSeen: new Date().toISOString() });
+        this.refreshDevicesUi();
+        this.appendLog(`Device connected: ${label}`);
+        msg.set_status(200, null);
+        msg.get_response_headers().set_content_type('application/json', { charset: 'utf-8' });
+        msg.get_response_body().append(new TextEncoder().encode(JSON.stringify({ deviceToken: token })));
+    }
+
+    revokeSelectedDevice() {
+        const deviceId = this.devicesCombo.get_active_id();
+        if (!deviceId) return;
+        const d = this.devices.get(deviceId);
+        if (!d) return;
+        d.revoked = true;
+        this.devices.set(deviceId, d);
+        this.refreshDevicesUi();
+        this.appendLog(`Revoked device: ${d.label}`);
+    }
+
+    revokeAllDevices() {
+        for (const [deviceId, d] of this.devices.entries()) {
+            d.revoked = true;
+            this.devices.set(deviceId, d);
+        }
+        this.rotateToken();
+        this.refreshDevicesUi();
+        this.appendLog('Revoked all devices');
+    }
+
+    touchDeviceByToken(msg) {
+        const deviceToken = msg.get_request_headers().get_one('X-LanDrop-Token') || '';
+        for (const [deviceId, d] of this.devices.entries()) {
+            if (d.token === deviceToken && !d.revoked) {
+                d.lastSeen = new Date().toISOString();
+                this.devices.set(deviceId, d);
+                return;
+            }
+        }
+    }
+
+    listUploadedFiles() {
+        const files = [];
+        try {
+            const dir = Gio.File.new_for_path(SAVE_DIR);
+            const enumerator = dir.enumerate_children('standard::name,standard::size,time::modified', Gio.FileQueryInfoFlags.NONE, null);
+            let info;
+            while ((info = enumerator.next_file(null)) !== null) {
+                files.push({
+                    name: info.get_name(),
+                    size: info.get_size(),
+                    modified: info.get_modification_date_time()?.format_iso8601() || '',
+                });
+            }
+            files.sort((a, b) => b.modified.localeCompare(a.modified));
+        } catch (e) {
+            this.appendLog(`Failed to list uploads: ${e.message}`);
+        }
+        return files;
     }
 
     parseMultipart(bodyBytes, contentType) {
@@ -145,6 +288,8 @@ class LanDropWindow extends Gtk.ApplicationWindow {
         });
 
         this.server.add_handler('/upload', (_srv, msg) => {
+            if (!this.requireAuthorized(msg)) return;
+            this.touchDeviceByToken(msg);
             if (msg.get_method() !== 'POST') {
                 msg.set_status(405, null);
                 return;
@@ -170,6 +315,31 @@ class LanDropWindow extends Gtk.ApplicationWindow {
             msg.get_response_headers().set_content_type('text/plain', { charset: 'utf-8' });
             const response = new TextEncoder().encode(`Uploaded ${saved} file(s)\n`);
             msg.get_response_body().append(response);
+        });
+
+        this.server.add_handler('/files', (_srv, msg) => {
+            if (!this.requireAuthorized(msg)) return;
+            this.touchDeviceByToken(msg);
+            if (msg.get_method() !== 'GET') {
+                msg.set_status(405, null);
+                return;
+            }
+            msg.set_status(200, null);
+            msg.get_response_headers().set_content_type('application/json', { charset: 'utf-8' });
+            msg.get_response_body().append(new TextEncoder().encode(JSON.stringify({ files: this.listUploadedFiles() })));
+        });
+
+        this.server.add_handler('/register-device', (_srv, msg) => {
+            const queryToken = this.parseQuery(msg.get_uri().get_query() || '').token || '';
+            if (queryToken !== this.accessToken) {
+                msg.set_status(403, null);
+                return;
+            }
+            if (msg.get_method() !== 'POST') {
+                msg.set_status(405, null);
+                return;
+            }
+            this.registerDevice(msg);
         });
 
         try {
