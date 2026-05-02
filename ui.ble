@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <object class="GtkBox" id="root_box">
+    <property name="orientation">vertical</property>
+    <property name="spacing">12</property>
+    <property name="margin-top">12</property>
+    <property name="margin-bottom">12</property>
+    <property name="margin-start">12</property>
+    <property name="margin-end">12</property>
+
+    <child>
+      <object class="GtkLabel" id="status_label">
+        <property name="xalign">0</property>
+        <property name="label">Press Start to begin sharing</property>
+      </object>
+    </child>
+
+    <child>
+      <object class="GtkBox">
+        <property name="spacing">8</property>
+        <child><object class="GtkButton" id="start_btn"><property name="label">Start Server</property></object></child>
+        <child><object class="GtkButton" id="stop_btn"><property name="label">Stop Server</property></object></child>
+        <child><object class="GtkButton" id="copy_btn"><property name="label">Copy URL</property></object></child>
+      </object>
+    </child>
+
+    <child>
+      <object class="GtkEntry" id="url_entry">
+        <property name="editable">false</property>
+      </object>
+    </child>
+
+    <child>
+      <object class="GtkPaned">
+        <property name="orientation">horizontal</property>
+        <property name="wide-handle">true</property>
+        <child>
+          <object class="GtkScrolledWindow">
+            <property name="hexpand">true</property>
+            <property name="vexpand">true</property>
+            <child>
+              <object class="GtkTextView">
+                <property name="editable">false</property>
+                <property name="monospace">true</property>
+                <property name="buffer">log_buffer</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkFrame">
+            <property name="label">Connect via QR</property>
+            <child>
+              <object class="GtkPicture" id="qr_picture">
+                <property name="content-fit">contain</property>
+                <property name="width-request">250</property>
+                <property name="height-request">250</property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+
+  <object class="GtkTextBuffer" id="log_buffer"/>
+</interface>
