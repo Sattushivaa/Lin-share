@@ -64,3 +64,13 @@ input[type="file"] {
 .boost:active { transform: translateY(1px) scale(0.99); }
 
 .message { margin-top: .9rem; min-height: 1.5rem; opacity: .9; }
+.actions { display: grid; gap: .6rem; margin-top: 1rem; }
+.secondary { background: linear-gradient(90deg, #8dd1ff, #9ef0de); }
+.danger { background: linear-gradient(90deg, #ff8b9a, #ffb782); }
+.files-list {
+  margin: .8rem 0 0;
+  padding-left: 1.2rem;
+  opacity: .95;
+  max-height: 200px;
+  overflow: auto;
+}

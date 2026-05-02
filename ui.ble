@@ -21,6 +21,7 @@
         <child><object class="GtkButton" id="start_btn"><property name="label">Start Server</property></object></child>
         <child><object class="GtkButton" id="stop_btn"><property name="label">Stop Server</property></object></child>
         <child><object class="GtkButton" id="copy_btn"><property name="label">Copy URL</property></object></child>
+        <child><object class="GtkButton" id="rotate_token_btn"><property name="label">Rotate Pairing Token</property></object></child>
       </object>
     </child>
 
@@ -51,10 +52,41 @@
           <object class="GtkFrame">
             <property name="label">Connect via QR</property>
             <child>
-              <object class="GtkPicture" id="qr_picture">
-                <property name="content-fit">contain</property>
-                <property name="width-request">250</property>
-                <property name="height-request">250</property>
+              <object class="GtkBox">
+                <property name="orientation">vertical</property>
+                <property name="spacing">8</property>
+                <property name="margin-top">6</property>
+                <child>
+                  <object class="GtkPicture" id="qr_picture">
+                    <property name="content-fit">contain</property>
+                    <property name="width-request">250</property>
+                    <property name="height-request">250</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkComboBoxText" id="devices_combo"/>
+                </child>
+                <child>
+                  <object class="GtkBox">
+                    <property name="spacing">8</property>
+                    <child><object class="GtkLabel"><property name="label">Allow new device pairing</property></object></child>
+                    <child>
+                      <object class="GtkSwitch" id="pairing_switch">
+                        <property name="active">true</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkButton" id="revoke_device_btn">
+                    <property name="label">Revoke Selected Device</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkButton" id="revoke_all_btn">
+                    <property name="label">Revoke All Devices</property>
+                  </object>
+                </child>
               </object>
             </child>
           </object>
