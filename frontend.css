@@ -19,7 +19,7 @@ body {
   font-family: Inter, system-ui, sans-serif;
 }
 
-.app { width: min(92vw, 480px); }
+.app { width: min(92vw, 560px); }
 .eyebrow { opacity: .8; letter-spacing: .08em; text-transform: uppercase; }
 .sub { opacity: .85; }
 
@@ -32,7 +32,21 @@ body {
   backdrop-filter: blur(8px);
 }
 
-.score { font-size: clamp(3rem, 8vw, 4.4rem); margin: .2rem 0 1rem; font-weight: 800; }
+.upload-form {
+  display: grid;
+  gap: .9rem;
+}
+
+.file-label { font-weight: 600; }
+
+input[type="file"] {
+  width: 100%;
+  padding: .75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.2);
+  background: rgba(0,0,0,.25);
+  color: var(--text);
+}
 
 .boost {
   width: 100%;

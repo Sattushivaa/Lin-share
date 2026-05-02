@@ -1,29 +1,31 @@
-const streakEl = document.getElementById('streak');
+const form = document.getElementById('uploadForm');
+const filesInput = document.getElementById('files');
 const messageEl = document.getElementById('message');
-const button = document.getElementById('boostBtn');
+const sendBtn = document.getElementById('sendBtn');
 
-const phrases = [
-  'Nice. Keep the chain alive.',
-  'Momentum unlocked 🔓',
-  'You are on fire today 🔥',
-  'One more for a new best?'
-];
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
 
-let streak = Number(localStorage.getItem('focus-streak') || 0);
-streakEl.textContent = streak;
+  if (!filesInput.files.length) {
+    messageEl.textContent = 'Please pick at least one file.';
+    return;
+  }
 
-button.addEventListener('click', () => {
-  streak += 1;
-  localStorage.setItem('focus-streak', String(streak));
-  streakEl.textContent = streak;
-  messageEl.textContent = phrases[Math.floor(Math.random() * phrases.length)];
+  const data = new FormData();
+  for (const file of filesInput.files) {
+    data.append('files', file, file.name);
+  }
 
-  button.animate(
-    [
-      { transform: 'scale(1)' },
-      { transform: 'scale(1.04)' },
-      { transform: 'scale(1)' }
-    ],
-    { duration: 180, easing: 'ease-out' }
-  );
+  sendBtn.disabled = true;
+  messageEl.textContent = 'Uploading...';
+
+  try {
+    const res = await fetch('/upload', { method: 'POST', body: data });
+    const text = await res.text();
+    messageEl.textContent = res.ok ? text.trim() : `Upload failed: ${text.trim()}`;
+  } catch (error) {
+    messageEl.textContent = `Network error: ${error.message}`;
+  } finally {
+    sendBtn.disabled = false;
+  }
 });

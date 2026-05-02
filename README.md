@@ -3,7 +3,8 @@
 A Linux desktop app (GTK4 + JavaScript) that:
 - starts a LAN HTTP server,
 - renders a QR code for quick mobile connection,
-- lets a phone open the URL and upload multiple files in one request.
+- serves a shared web frontend (`frontend.html`, `frontend.css`, `frontend.js`),
+- lets a phone upload multiple files in one request.
 
 ## Requirements
 - `gjs`
