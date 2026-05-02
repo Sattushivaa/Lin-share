@@ -1,168 +1,29 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Device Access Control</title>
-  <style>
-    :root { font-family: Arial, sans-serif; color-scheme: light; }
-    body { margin: 0; background: #f5f7fb; color: #1f2937; }
-    .container { max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { margin-bottom: .5rem; }
-    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
-    .device-item, .file-item { display: flex; justify-content: space-between; align-items: center; padding: .6rem; border-bottom: 1px solid #f0f2f5; }
-    .device-item:last-child, .file-item:last-child { border-bottom: none; }
-    .device-meta { display: flex; flex-direction: column; gap: .2rem; }
-    .badge { font-size: .75rem; padding: .15rem .4rem; border-radius: 999px; }
-    .allowed { background: #d1fae5; color: #065f46; }
-    .revoked { background: #fee2e2; color: #991b1b; }
-    button { border: 1px solid #d1d5db; background: #fff; border-radius: 6px; padding: .35rem .55rem; cursor: pointer; }
-    button:hover { background: #f9fafb; }
-    button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
-    button.primary:hover { background: #1d4ed8; }
-    .muted { color: #6b7280; font-size: .9rem; }
-    .empty { padding: .5rem 0; color: #6b7280; }
-    @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
-  </style>
-</head>
-<body>
-  <main class="container">
-    <h1>Mobile Access Revocation Panel</h1>
-    <p class="muted">Revoke access to any mobile device while keeping one connected device allowed to view and download folder files.</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LanDrop Upload</title>
+    <link rel="stylesheet" href="frontend.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <p class="eyebrow">LanDrop</p>
+        <h1>Secure LAN file upload</h1>
+        <p class="sub">Select one or many files, then send them to your desktop in a single batch.</p>
+      </header>
 
-    <section class="layout">
-      <div class="card">
-        <h2>Connected Devices</h2>
-        <div id="devices"></div>
-      </div>
+      <section class="card">
+        <form id="uploadForm" class="upload-form">
+          <label for="files" class="file-label">Choose files</label>
+          <input id="files" name="files" type="file" multiple required />
+          <button id="sendBtn" class="boost" type="submit">Send files</button>
+        </form>
+        <p id="message" class="message">Waiting for upload.</p>
+      </section>
+    </main>
 
-      <div class="card">
-        <h2>Allowed Device File Access</h2>
-        <p class="muted" id="selectedDeviceHint"></p>
-        <div id="files"></div>
-      </div>
-    </section>
-  </main>
-
-  <script>
-    const state = {
-      selectedDeviceId: 'd3',
-      devices: [
-        { id: 'd1', name: 'iPhone 15', type: 'mobile', access: 'revoked' },
-        { id: 'd2', name: 'Pixel 8', type: 'mobile', access: 'revoked' },
-        { id: 'd3', name: 'Office Laptop', type: 'desktop', access: 'allowed' },
-        { id: 'd4', name: 'Galaxy Tab', type: 'mobile', access: 'revoked' }
-      ],
-      files: [
-        { name: 'Q2-plan.pdf', size: '1.8 MB' },
-        { name: 'pricing.xlsx', size: '246 KB' },
-        { name: 'brand-assets.zip', size: '12.4 MB' }
-      ]
-    };
-
-    function deviceLabel(device) {
-      return `${device.name} (${device.type})`;
-    }
-
-    function renderDevices() {
-      const root = document.getElementById('devices');
-      root.innerHTML = '';
-
-      state.devices.forEach((device) => {
-        const row = document.createElement('div');
-        row.className = 'device-item';
-
-        const meta = document.createElement('div');
-        meta.className = 'device-meta';
-        meta.innerHTML = `
-          <strong>${deviceLabel(device)}</strong>
-          <span class="badge ${device.access}">${device.access.toUpperCase()}</span>
-        `;
-
-        const actions = document.createElement('div');
-
-        const allowBtn = document.createElement('button');
-        allowBtn.className = 'primary';
-        allowBtn.textContent = 'Allow + Use for Files';
-        allowBtn.onclick = () => allowOnlyThisDevice(device.id);
-
-        const revokeBtn = document.createElement('button');
-        revokeBtn.textContent = 'Revoke';
-        revokeBtn.style.marginLeft = '.4rem';
-        revokeBtn.onclick = () => revokeDevice(device.id);
-
-        actions.appendChild(allowBtn);
-        actions.appendChild(revokeBtn);
-
-        row.appendChild(meta);
-        row.appendChild(actions);
-        root.appendChild(row);
-      });
-    }
-
-    function allowOnlyThisDevice(deviceId) {
-      state.devices = state.devices.map((d) => ({
-        ...d,
-        access: d.id === deviceId ? 'allowed' : 'revoked'
-      }));
-      state.selectedDeviceId = deviceId;
-      render();
-    }
-
-    function revokeDevice(deviceId) {
-      state.devices = state.devices.map((d) => d.id === deviceId ? { ...d, access: 'revoked' } : d);
-      if (state.selectedDeviceId === deviceId) {
-        state.selectedDeviceId = null;
-      }
-      render();
-    }
-
-    function triggerDownload(fileName) {
-      const blob = new Blob([`Mock content for ${fileName}`], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function renderFiles() {
-      const fileRoot = document.getElementById('files');
-      const hint = document.getElementById('selectedDeviceHint');
-      fileRoot.innerHTML = '';
-
-      const allowed = state.devices.find((d) => d.id === state.selectedDeviceId && d.access === 'allowed');
-
-      if (!allowed) {
-        hint.textContent = 'No device currently has access. Allow one connected device to view files.';
-        fileRoot.innerHTML = '<p class="empty">Files are hidden until a device is allowed.</p>';
-        return;
-      }
-
-      hint.textContent = `Active device: ${deviceLabel(allowed)}`;
-
-      state.files.forEach((file) => {
-        const row = document.createElement('div');
-        row.className = 'file-item';
-        row.innerHTML = `<span>${file.name} <span class="muted">(${file.size})</span></span>`;
-
-        const btn = document.createElement('button');
-        btn.textContent = 'Download';
-        btn.onclick = () => triggerDownload(file.name);
-
-        row.appendChild(btn);
-        fileRoot.appendChild(row);
-      });
-    }
-
-    function render() {
-      renderDevices();
-      renderFiles();
-    }
-
-    render();
-  </script>
-</body>
+    <script src="frontend.js"></script>
+  </body>
 </html>

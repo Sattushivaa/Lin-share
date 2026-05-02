@@ -3,24 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Focus Flow</title>
+    <title>LanDrop Upload</title>
     <link rel="stylesheet" href="frontend.css" />
   </head>
   <body>
     <main class="app">
       <header>
-        <p class="eyebrow">Daily Momentum</p>
-        <h1>Level up your streak</h1>
-        <p class="sub">Tiny wins. Fast feedback. Keep the rhythm.</p>
+        <p class="eyebrow">LanDrop</p>
+        <h1>Secure LAN file upload</h1>
+        <p class="sub">Select one or many files, then send them to your desktop in a single batch.</p>
       </header>
 
       <section class="card">
-        <div class="score-wrap">
-          <p>Current streak</p>
-          <p id="streak" class="score">0</p>
-        </div>
-        <button id="boostBtn" class="boost">⚡ Complete a micro-task</button>
-        <p id="message" class="message">Tap to build momentum.</p>
+        <form id="uploadForm" class="upload-form">
+          <label for="files" class="file-label">Choose files</label>
+          <input id="files" name="files" type="file" multiple required />
+          <button id="sendBtn" class="boost" type="submit">Send files</button>
+        </form>
+        <p id="message" class="message">Waiting for upload.</p>
       </section>
     </main>
 

@@ -9,6 +9,7 @@ import Gdk from 'gi://Gdk';
 const APP_ID = 'com.example.LanDrop';
 const PORT = 8977;
 const SAVE_DIR = GLib.build_filenamev([GLib.get_home_dir(), 'LanDropUploads']);
+const APP_DIR = GLib.get_current_dir();
 
 function ensureDir(path) {
     try {
@@ -73,19 +74,20 @@ class LanDropWindow extends Gtk.ApplicationWindow {
         }
     }
 
+    readAsset(filename) {
+        const path = GLib.build_filenamev([APP_DIR, filename]);
+        try {
+            const [ok, contents] = GLib.file_get_contents(path);
+            if (!ok) return null;
+            return new TextDecoder('utf-8').decode(contents);
+        } catch (e) {
+            this.appendLog(`Failed reading ${filename}: ${e.message}`);
+            return null;
+        }
+    }
+
     html() {
-        return `<!DOCTYPE html>
-<html>
-  <head><meta name="viewport" content="width=device-width,initial-scale=1"/><title>LanDrop</title></head>
-  <body style="font-family:sans-serif;max-width:600px;margin:2rem auto;padding:1rem;">
-    <h2>Secure LAN upload</h2>
-    <p>Select multiple files and upload in one batch.</p>
-    <form method="POST" enctype="multipart/form-data" action="/upload">
-      <input type="file" name="files" multiple required /><br/><br/>
-      <button type="submit">Send files</button>
-    </form>
-  </body>
-</html>`;
+        return this.readAsset('frontend.html') || this.readAsset('index.html') || '<h1>Frontend missing</h1>';
     }
 
     parseMultipart(bodyBytes, contentType) {
@@ -118,6 +120,28 @@ class LanDropWindow extends Gtk.ApplicationWindow {
             msg.get_response_headers().set_content_type('text/html', { charset: 'utf-8' });
             const bytes = new TextEncoder().encode(this.html());
             msg.get_response_body().append(bytes);
+        });
+
+        this.server.add_handler('/frontend.css', (_srv, msg) => {
+            const css = this.readAsset('frontend.css');
+            if (!css) {
+                msg.set_status(404, null);
+                return;
+            }
+            msg.set_status(200, null);
+            msg.get_response_headers().set_content_type('text/css', { charset: 'utf-8' });
+            msg.get_response_body().append(new TextEncoder().encode(css));
+        });
+
+        this.server.add_handler('/frontend.js', (_srv, msg) => {
+            const js = this.readAsset('frontend.js');
+            if (!js) {
+                msg.set_status(404, null);
+                return;
+            }
+            msg.set_status(200, null);
+            msg.get_response_headers().set_content_type('application/javascript', { charset: 'utf-8' });
+            msg.get_response_body().append(new TextEncoder().encode(js));
         });
 
         this.server.add_handler('/upload', (_srv, msg) => {
